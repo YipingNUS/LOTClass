@@ -104,11 +104,14 @@ class LOTClassTrainer(object):
             corpus = open(os.path.join(dataset_dir, text_file), encoding="utf-8")
             docs = [doc.strip() for doc in corpus.readlines()]
             print(f"Converting texts into tensors.")
-            chunk_size = ceil(len(docs) / self.num_cpus)
-            chunks = [docs[x:x+chunk_size] for x in range(0, len(docs), chunk_size)]
-            results = Parallel(n_jobs=self.num_cpus)(delayed(self.encode)(docs=chunk) for chunk in chunks)
-            input_ids = torch.cat([result[0] for result in results])
-            attention_masks = torch.cat([result[1] for result in results])
+            #chunk_size = ceil(len(docs) / self.num_cpus)
+            #chunks = [docs[x:x+chunk_size] for x in range(0, len(docs), chunk_size)]
+            #results = Parallel(n_jobs=self.num_cpus)(delayed(self.encode)(docs=chunk) for chunk in chunks)
+            #input_ids = torch.cat([result[0] for result in results])
+            #attention_masks = torch.cat([result[1] for result in results])
+            # commented out joblib (ln107-111) because it's causing problem. https://github.com/yumeng5/LOTClass/issues/8
+            input_ids, attention_masks = self.encode(docs)
+
             print(f"Saving encoded texts into {loader_file}")
             if label_file is not None:
                 print(f"Reading labels from {os.path.join(dataset_dir, label_file)}")

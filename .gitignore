@@ -1,3 +1,4 @@
+.idea
 *.txt
 !requirements.txt
 *.pt
