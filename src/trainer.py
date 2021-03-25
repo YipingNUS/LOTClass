@@ -158,7 +158,8 @@ class LOTClassTrainer(object):
             wordpcs.append(wordpc[2:] if wordpc.startswith("##") else wordpc)
             if idx >= self.max_len - 1: # last index will be [SEP] token
                 break
-            if i == len(doc) - 1 or not doc[i+1].startswith("##"):
+            # words beginning with "##" are subword tokens
+            if i == len(doc) - 1 or not doc[i+1].startswith("##"):  # if is the last token or is the end of a word
                 word = ''.join(wordpcs)
                 if word in self.label2class:
                     label_idx[idx] = self.label2class[word]
@@ -253,7 +254,7 @@ class LOTClassTrainer(object):
                 word = self.inv_vocab[word_id]
                 if word in self.label_name_dict[i]:
                     continue
-                if not word.isalpha() or len(word) == 1 or word in stopwords_vocab or word_id in repeat_words:
+                if not word.isalpha() or len(word) < 3 or word in stopwords_vocab or word_id in repeat_words:
                     delete_idx.append(j)
             self.category_vocab[i] = np.delete(self.category_vocab[i], delete_idx)
 
