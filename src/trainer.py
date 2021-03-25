@@ -539,6 +539,7 @@ class LOTClassTrainer(object):
         if self.early_stop:
             agree_count = 0
         for i in range(int(total_steps / self.update_interval)):
+            print(f"Self training :: step {i} of {int(total_steps / self.update_interval)}")
             self_train_dict, idx, agree = self.prepare_self_train_data(rank, model, idx)
             # early stop if current prediction agrees with target distribution for 3 consecutive updates
             if self.early_stop:
@@ -551,12 +552,15 @@ class LOTClassTrainer(object):
             self_train_dataset_loader = self.make_dataloader(rank, self_train_dict, self.train_batch_size)
             self.self_train_batches(rank, model, self_train_dataset_loader, optimizer, scheduler)
             try:
-                if self.with_test_label and (i+1%10==0 or i == int(total_steps / self.update_interval)-1):
+                if self.with_test_label and ((i+1)%10==0 or i == int(total_steps / self.update_interval)-1):
                     acc = self.inference(model, test_dataset_loader, rank, return_type="acc")
                     gather_acc = [torch.ones_like(acc) for _ in range(self.world_size)]
                     dist.all_gather(gather_acc, acc)
                     acc = torch.tensor(gather_acc).mean().item()
-                    print(f"Test acc: {acc}")
+                    print(f"Step-{i} - Test acc: {acc}")
+                    loader_file = os.path.join(self.dataset_dir, "temp_"+loader_name)
+                    print(f"Saving intermediate model to {loader_file}")
+                    torch.save(model.module.state_dict(), loader_file)
             except RuntimeError as err:
                 self.cuda_mem_error(err, "train", rank)
 
