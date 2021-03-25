@@ -535,7 +535,7 @@ class LOTClassTrainer(object):
         # Yiping: need to reduce the training batch size to avoid OOM
         self.train_batch_size //= 2
         self.accum_steps *= 2
-        
+
         model = self.set_up_dist(rank)
         test_dataset_loader = self.make_dataloader(rank, self.test_data, self.eval_batch_size) if self.with_test_label else None
         total_steps = int(len(self.train_data["input_ids"]) * epochs / (self.world_size * self.train_batch_size * self.accum_steps))
