@@ -488,7 +488,7 @@ class LOTClassTrainer(object):
         return self_train_dict, idx, agree
 
     # train a model on batches of data with target labels
-    def self_train_batches(self, rank, model, self_train_loader, optimizer, scheduler, test_dataset_loader):
+    def self_train_batches(self, rank, model, self_train_loader, optimizer, scheduler):
         model.train()
         total_train_loss = 0
         wrap_train_dataset_loader = tqdm(self_train_loader) if rank == 0 else self_train_loader
@@ -513,11 +513,7 @@ class LOTClassTrainer(object):
                     optimizer.step()
                     scheduler.step()
                     model.zero_grad()
-            if self.with_test_label:
-                acc = self.inference(model, test_dataset_loader, rank, return_type="acc")
-                gather_acc = [torch.ones_like(acc) for _ in range(self.world_size)]
-                dist.all_gather(gather_acc, acc)
-                acc = torch.tensor(gather_acc).mean().item()
+
             avg_train_loss = torch.tensor([total_train_loss / len(wrap_train_dataset_loader) * self.accum_steps]).to(rank)
             gather_list = [torch.ones_like(avg_train_loss) for _ in range(self.world_size)]
             dist.all_gather(gather_list, avg_train_loss)
@@ -525,8 +521,6 @@ class LOTClassTrainer(object):
             if rank == 0:
                 print(f"lr: {optimizer.param_groups[0]['lr']:.4g}")
                 print(f"Average training loss: {avg_train_loss.mean().item()}")
-                if self.with_test_label:
-                    print(f"Test acc: {acc}")
         except RuntimeError as err:
             self.cuda_mem_error(err, "train", rank)
 
@@ -555,7 +549,17 @@ class LOTClassTrainer(object):
                 if agree_count >= 3:
                     break
             self_train_dataset_loader = self.make_dataloader(rank, self_train_dict, self.train_batch_size)
-            self.self_train_batches(rank, model, self_train_dataset_loader, optimizer, scheduler, test_dataset_loader)
+            self.self_train_batches(rank, model, self_train_dataset_loader, optimizer, scheduler)
+            try:
+                if self.with_test_label and (i+1%10==0 or i == int(total_steps / self.update_interval)-1):
+                    acc = self.inference(model, test_dataset_loader, rank, return_type="acc")
+                    gather_acc = [torch.ones_like(acc) for _ in range(self.world_size)]
+                    dist.all_gather(gather_acc, acc)
+                    acc = torch.tensor(gather_acc).mean().item()
+                    print(f"Test acc: {acc}")
+            except RuntimeError as err:
+                self.cuda_mem_error(err, "train", rank)
+
         if rank == 0:
             loader_file = os.path.join(self.dataset_dir, loader_name)
             print(f"Saving final model to {loader_file}")
